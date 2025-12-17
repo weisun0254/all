@@ -1,0 +1,987 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>忍者數學：忍道試煉</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap');
+        
+        body {
+            font-family: 'Noto Sans TC', sans-serif;
+            background-color: #1a202c; /* Gray 900 */
+            color: #fff;
+            overflow: hidden; /* Prevent scrolling on mobile */
+            touch-action: none;
+        }
+
+        #game-canvas {
+            background: linear-gradient(to bottom, #0f172a, #1e293b);
+            box-shadow: 0 0 20px rgba(249, 115, 22, 0.3); /* Orange glow */
+            border: 4px solid #4338ca; /* Indigo border */
+            border-radius: 8px;
+            cursor: pointer;
+        }
+        
+        .game-wrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+        }
+    </style>
+</head>
+<body>
+
+<div class="game-wrapper p-2">
+    <!-- Header -->
+    <div class="text-center mb-2">
+        <h1 class="text-3xl md:text-4xl font-black text-orange-500 tracking-wider" style="text-shadow: 2px 2px 0px #000;">
+            🍥 忍者數學：忍道試煉
+        </h1>
+        <p class="text-indigo-300 text-sm mt-1">通過五大試煉，成為火影級數學大師！</p>
+    </div>
+
+    <!-- Canvas -->
+    <canvas id="game-canvas" width="800" height="600" class="max-w-full h-auto"></canvas>
+
+    <!-- Developer Footer -->
+    <footer class="mt-4 text-center text-gray-400 text-xs">
+        <p class="font-bold">開發者：王智德 (Wang Zhide)</p>
+        <p>Email: <a href="mailto:weisun0254@gmail.com" class="text-orange-400 hover:text-orange-300 transition">weisun0254@gmail.com</a></p>
+    </footer>
+</div>
+
+<script>
+/**
+ * 簡易遊戲引擎 (Game Engine)
+ */
+class Game {
+    constructor(canvasId) {
+        this.canvas = document.getElementById(canvasId);
+        this.ctx = this.canvas.getContext('2d');
+        this.width = this.canvas.width;
+        this.height = this.canvas.height;
+        this.currentScene = null;
+        this.lastTime = 0;
+        this.input = { x: 0, y: 0, isDown: false, clicked: false };
+
+        // 調整 canvas 大小以適應螢幕
+        this.resize();
+        window.addEventListener('resize', () => this.resize());
+
+        // 輸入監聽
+        this.canvas.addEventListener('mousedown', (e) => this.handleStart(e));
+        this.canvas.addEventListener('mousemove', (e) => this.handleMove(e));
+        this.canvas.addEventListener('mouseup', (e) => this.handleEnd(e));
+        
+        this.canvas.addEventListener('touchstart', (e) => this.handleStart(e));
+        this.canvas.addEventListener('touchmove', (e) => this.handleMove(e));
+        this.canvas.addEventListener('touchend', (e) => this.handleEnd(e));
+
+        // 開始循環
+        requestAnimationFrame((ts) => this.loop(ts));
+    }
+
+    resize() {
+        const maxWidth = 800;
+        const maxHeight = 600;
+        const aspect = maxWidth / maxHeight;
+        
+        let w = window.innerWidth - 32; // padding
+        let h = w / aspect;
+
+        if (h > window.innerHeight - 150) {
+            h = window.innerHeight - 150;
+            w = h * aspect;
+        }
+
+        // 保持內部解析度，縮放 CSS
+        this.canvas.style.width = `${w}px`;
+        this.canvas.style.height = `${h}px`;
+        
+        // 更新座標映射比例
+        this.scaleX = maxWidth / w;
+        this.scaleY = maxHeight / h;
+    }
+
+    getPointerPos(e) {
+        const rect = this.canvas.getBoundingClientRect();
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+        return {
+            x: (clientX - rect.left) * this.scaleX,
+            y: (clientY - rect.top) * this.scaleY
+        };
+    }
+
+    handleStart(e) {
+        e.preventDefault();
+        const pos = this.getPointerPos(e);
+        this.input.x = pos.x;
+        this.input.y = pos.y;
+        this.input.isDown = true;
+        this.input.clicked = true;
+    }
+
+    handleMove(e) {
+        e.preventDefault();
+        if (!this.input.isDown) return; // 只在按下時追蹤，或隨時追蹤視需求
+        const pos = this.getPointerPos(e);
+        this.input.x = pos.x;
+        this.input.y = pos.y;
+    }
+
+    handleEnd(e) {
+        e.preventDefault();
+        this.input.isDown = false;
+    }
+
+    changeScene(scene) {
+        this.currentScene = scene;
+        this.currentScene.game = this;
+        this.currentScene.init();
+    }
+
+    loop(timestamp) {
+        const dt = (timestamp - this.lastTime) / 1000;
+        this.lastTime = timestamp;
+
+        if (this.currentScene) {
+            this.currentScene.update(dt);
+            this.ctx.clearRect(0, 0, this.width, this.height);
+            this.currentScene.draw(this.ctx);
+        }
+
+        // Reset click flag
+        this.input.clicked = false;
+
+        requestAnimationFrame((ts) => this.loop(ts));
+    }
+}
+
+/**
+ * 場景基類 (Scene Base)
+ */
+class Scene {
+    constructor() { this.game = null; }
+    init() {}
+    update(dt) {}
+    draw(ctx) {}
+}
+
+// ==========================================
+// 共用繪圖函式庫 (Ninja Assets)
+// ==========================================
+const Draw = {
+    text: (ctx, text, x, y, size = 20, color = 'white', align = 'center') => {
+        ctx.fillStyle = color;
+        ctx.font = `bold ${size}px "Noto Sans TC", sans-serif`;
+        ctx.textAlign = align;
+        ctx.textBaseline = 'middle';
+        ctx.fillText(text, x, y);
+    },
+    
+    button: (ctx, text, x, y, w, h, hover, color = '#f97316') => {
+        ctx.save();
+        ctx.fillStyle = hover ? '#fff' : color;
+        ctx.beginPath();
+        ctx.roundRect(x, y, w, h, 10);
+        ctx.fill();
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = '#fff';
+        ctx.stroke();
+        
+        ctx.fillStyle = hover ? color : '#fff';
+        ctx.font = 'bold 24px "Noto Sans TC"';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(text, x + w/2, y + h/2);
+        ctx.restore();
+    },
+
+    shuriken: (ctx, x, y, size, rotation) => {
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(rotation);
+        ctx.fillStyle = '#94a3b8'; // metal gray
+        ctx.beginPath();
+        for (let i = 0; i < 4; i++) {
+            ctx.lineTo(0, -size);
+            ctx.bezierCurveTo(size/4, -size/4, size/4, -size/4, size, 0);
+            ctx.rotate(Math.PI / 2);
+        }
+        ctx.fill();
+        ctx.fillStyle = '#cbd5e1'; // center hole
+        ctx.beginPath();
+        ctx.arc(0, 0, size/5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+    },
+
+    scroll: (ctx, x, y, w, h) => {
+        // Body
+        ctx.fillStyle = '#fde047'; // yellow paper
+        ctx.fillRect(x, y, w, h);
+        // Ends
+        ctx.fillStyle = '#7f1d1d'; // dark red wood
+        ctx.fillRect(x - 10, y - 5, 10, h + 10);
+        ctx.fillRect(x + w, y - 5, 10, h + 10);
+        // Lines
+        ctx.strokeStyle = '#b45309';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(x + 10, y + 10);
+        ctx.lineTo(x + w - 10, y + 10);
+        ctx.stroke();
+    },
+    
+    ninjaIcon: (ctx, x, y) => {
+        // Simple Headband
+        ctx.fillStyle = '#1e3a8a'; // Blue band
+        ctx.fillRect(x-30, y-10, 60, 20);
+        ctx.fillStyle = '#94a3b8'; // Metal plate
+        ctx.fillRect(x-20, y-8, 40, 16);
+        // Leaf symbol (simplified spiral)
+        ctx.strokeStyle = '#1e293b';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(x, y, 4, 0, Math.PI*2);
+        ctx.moveTo(x, y);
+        ctx.lineTo(x-3, y+3);
+        ctx.stroke();
+    }
+};
+
+// ==========================================
+// 場景實作
+// ==========================================
+
+/**
+ * 主選單場景 (Menu Scene)
+ */
+class MenuScene extends Scene {
+    constructor() {
+        super();
+        this.buttons = [
+            { id: 1, text: '除法忍術', x: 150, y: 200, w: 220, h: 60, scene: 'Division' },
+            { id: 2, text: '結印幾何', x: 430, y: 200, w: 220, h: 60, scene: 'Geometry' },
+            { id: 3, text: '奧義併式', x: 150, y: 300, w: 220, h: 60, scene: 'OrderOps' },
+            { id: 4, text: '查克拉小數', x: 430, y: 300, w: 220, h: 60, scene: 'Decimal' },
+            { id: 5, text: '情報統計', x: 290, y: 400, w: 220, h: 60, scene: 'Stats' },
+        ];
+        this.rotation = 0;
+    }
+
+    update(dt) {
+        this.rotation += dt;
+        
+        // 檢查按鈕點擊
+        if (this.game.input.clicked) {
+            const mx = this.game.input.x;
+            const my = this.game.input.y;
+            this.buttons.forEach(btn => {
+                if (mx > btn.x && mx < btn.x + btn.w && my > btn.y && my < btn.y + btn.h) {
+                    switch(btn.scene) {
+                        case 'Division': this.game.changeScene(new DivisionScene()); break;
+                        case 'Geometry': this.game.changeScene(new GeometryScene()); break;
+                        case 'OrderOps': this.game.changeScene(new OrderOpsScene()); break;
+                        case 'Decimal': this.game.changeScene(new DecimalScene()); break;
+                        case 'Stats': this.game.changeScene(new StatsScene()); break;
+                    }
+                }
+            });
+        }
+    }
+
+    draw(ctx) {
+        // Background elements
+        Draw.shuriken(ctx, 100, 100, 50, this.rotation);
+        Draw.shuriken(ctx, 700, 500, 80, -this.rotation * 0.5);
+
+        // Title
+        Draw.ninjaIcon(ctx, 400, 80);
+        Draw.text(ctx, "選擇你的試煉", 400, 140, 32, '#fb923c');
+
+        // Buttons
+        const mx = this.game.input.x;
+        const my = this.game.input.y;
+        
+        this.buttons.forEach(btn => {
+            const hover = (mx > btn.x && mx < btn.x + btn.w && my > btn.y && my < btn.y + btn.h);
+            Draw.button(ctx, btn.text, btn.x, btn.y, btn.w, btn.h, hover);
+        });
+    }
+}
+
+/**
+ * 單元一：除法忍術 (Division)
+ * 互動式直式除法，引導試商
+ */
+class DivisionScene extends Scene {
+    init() {
+        this.state = 'start'; // start, selecting, result
+        this.dividend = 0;
+        this.divisor = 0;
+        this.quotient = 0;
+        this.options = [];
+        this.message = "點擊卷軸領取除法任務";
+        this.generateProblem();
+        this.backBtn = { x: 20, y: 20, w: 100, h: 40, text: "回主選單" };
+    }
+
+    generateProblem() {
+        // 產生可以整除的題目 (2位數 / 1位數)
+        this.divisor = Math.floor(Math.random() * 8) + 2; // 2-9
+        this.quotient = Math.floor(Math.random() * 9) + 1; // 1-9 (保持簡單，個位數商)
+        // 為了增加趣味，偶爾讓被除數大一點，我們做兩步驟除法太複雜，先做一步驟但強調「餘數為0」
+        // 或者做簡單的兩位數除以一位數，商是兩位數
+        // 讓我們做：商是個位數的除法，或者是簡單的商兩位數。
+        // 為配合「試商」，我們做商是個位數，但數字稍大，例如 72 / 8
+        this.dividend = this.divisor * this.quotient;
+        
+        // 選項
+        this.options = [];
+        let correct = this.quotient;
+        this.options.push(correct);
+        while (this.options.length < 3) {
+            let r = Math.floor(Math.random() * 9) + 1;
+            if (!this.options.includes(r)) this.options.push(r);
+        }
+        this.options.sort(() => Math.random() - 0.5);
+        this.state = 'selecting';
+        this.message = `求 ${this.dividend} ÷ ${this.divisor} 的商？`;
+    }
+
+    update(dt) {
+        if (this.game.input.clicked) {
+            const mx = this.game.input.x;
+            const my = this.game.input.y;
+
+            // Back button
+            if (mx > this.backBtn.x && mx < this.backBtn.x + this.backBtn.w &&
+                my > this.backBtn.y && my < this.backBtn.y + this.backBtn.h) {
+                this.game.changeScene(new MenuScene());
+                return;
+            }
+
+            if (this.state === 'selecting') {
+                for (let i = 0; i < this.options.length; i++) {
+                    const bx = 300 + i * 100;
+                    const by = 400;
+                    // Check circles
+                    const dx = mx - bx;
+                    const dy = my - by;
+                    if (Math.sqrt(dx*dx + dy*dy) < 30) {
+                        if (this.options[i] === this.quotient) {
+                            this.message = "忍術成功！正解！";
+                            this.state = 'result';
+                            setTimeout(() => this.generateProblem(), 1500);
+                        } else {
+                            this.message = "查克拉紊亂...再試一次！";
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    draw(ctx) {
+        Draw.button(ctx, this.backBtn.text, this.backBtn.x, this.backBtn.y, this.backBtn.w, this.backBtn.h, false, '#475569');
+        
+        // 標題
+        Draw.text(ctx, "除法忍術", 400, 50, 30, '#fde047');
+        Draw.text(ctx, this.message, 400, 500, 24, '#fff');
+
+        // 直式除法視覺化
+        const cx = 400;
+        const cy = 200;
+        
+        ctx.strokeStyle = 'white';
+        ctx.lineWidth = 4;
+        
+        // 除號 (廠)
+        ctx.beginPath();
+        ctx.moveTo(cx - 20, cy);
+        ctx.bezierCurveTo(cx, cy - 10, cx + 10, cy - 10, cx + 20, cy); // Curve part
+        ctx.moveTo(cx - 10, cy + 5);
+        ctx.lineTo(cx + 80, cy + 5); // Top line
+        ctx.lineTo(cx - 10, cy + 80); // Left curve (simplified to line for style)
+        // 其實標準直式除號： )_____
+        ctx.clearRect(cx-50, cy-50, 200, 200); // clear area
+        
+        // Draw Layout
+        ctx.beginPath();
+        ctx.moveTo(cx - 10, cy); 
+        ctx.quadraticCurveTo(cx - 20, cy + 30, cx - 10, cy + 60); // Curved bracket )
+        ctx.moveTo(cx - 10, cy);
+        ctx.lineTo(cx + 80, cy); // Top bar
+        ctx.stroke();
+
+        // Numbers
+        ctx.font = "bold 40px 'Noto Sans TC'";
+        ctx.fillStyle = '#fff';
+        ctx.textAlign = 'right';
+        ctx.fillText(this.divisor, cx - 25, cy + 40); // Divisor
+        ctx.textAlign = 'left';
+        ctx.fillText(this.dividend, cx + 10, cy + 40); // Dividend
+
+        // Box for Quotient (Question Mark or Answer)
+        if (this.state === 'selecting') {
+            ctx.fillStyle = '#fbbf24';
+            ctx.fillText("?", cx + 20, cy - 20);
+        } else {
+            ctx.fillStyle = '#4ade80';
+            ctx.fillText(this.quotient, cx + 20, cy - 20);
+        }
+
+        // Draw Options
+        if (this.state === 'selecting') {
+            this.options.forEach((opt, i) => {
+                const bx = 300 + i * 100;
+                const by = 400;
+                ctx.beginPath();
+                ctx.arc(bx, by, 30, 0, Math.PI*2);
+                ctx.fillStyle = '#1e40af';
+                ctx.fill();
+                ctx.strokeStyle = '#60a5fa';
+                ctx.stroke();
+                
+                ctx.fillStyle = 'white';
+                ctx.font = "bold 24px Arial";
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(opt, bx, by);
+            });
+        }
+    }
+}
+
+/**
+ * 單元二：結印幾何 (Geometry)
+ * 圖形拖曳配對
+ */
+class GeometryScene extends Scene {
+    init() {
+        this.shapes = [];
+        this.targets = [];
+        this.draggedShape = null;
+        this.score = 0;
+        this.backBtn = { x: 20, y: 20, w: 100, h: 40, text: "回主選單" };
+        this.spawnShapes();
+    }
+
+    spawnShapes() {
+        // Types: 'circle' (Shuriken), 'rect' (Scroll), 'triangle' (Kunai)
+        const types = ['circle', 'rect', 'triangle'];
+        this.shapes = [];
+        this.targets = [];
+        
+        types.forEach((t, i) => {
+            // Targets (Silhouettes)
+            this.targets.push({
+                type: t,
+                x: 150 + i * 200,
+                y: 200,
+                filled: false
+            });
+            // Draggables (Random pos at bottom)
+            this.shapes.push({
+                type: t,
+                x: 150 + Math.random() * 400,
+                y: 450,
+                isDragging: false,
+                matched: false,
+                homeX: 0, homeY: 0 // set later
+            });
+        });
+
+        // Store home positions
+        this.shapes.forEach(s => {
+            s.homeX = s.x;
+            s.homeY = s.y;
+        });
+    }
+
+    update(dt) {
+        const mx = this.game.input.x;
+        const my = this.game.input.y;
+
+        // Back button
+        if (this.game.input.clicked && mx > this.backBtn.x && mx < this.backBtn.x + this.backBtn.w && my > this.backBtn.y && my < this.backBtn.y + this.backBtn.h) {
+            this.game.changeScene(new MenuScene());
+            return;
+        }
+
+        if (this.game.input.isDown) {
+            if (!this.draggedShape) {
+                // Try to pick up
+                for (let s of this.shapes) {
+                    if (s.matched) continue;
+                    let hit = false;
+                    if (s.type === 'circle' && Math.hypot(mx-s.x, my-s.y) < 30) hit = true;
+                    if (s.type === 'rect' && mx > s.x-30 && mx < s.x+30 && my > s.y-20 && my < s.y+20) hit = true;
+                    if (s.type === 'triangle' && Math.hypot(mx-s.x, my-s.y) < 30) hit = true;
+
+                    if (hit && this.game.input.clicked) {
+                        this.draggedShape = s;
+                        s.isDragging = true;
+                        break;
+                    }
+                }
+            }
+            
+            if (this.draggedShape) {
+                this.draggedShape.x = mx;
+                this.draggedShape.y = my;
+            }
+        } else {
+            // Drop
+            if (this.draggedShape) {
+                let matched = false;
+                for (let t of this.targets) {
+                    if (t.type === this.draggedShape.type && Math.hypot(this.draggedShape.x - t.x, this.draggedShape.y - t.y) < 50) {
+                        this.draggedShape.x = t.x;
+                        this.draggedShape.y = t.y;
+                        this.draggedShape.matched = true;
+                        matched = true;
+                        this.score++;
+                    }
+                }
+                if (!matched) {
+                    this.draggedShape.x = this.draggedShape.homeX;
+                    this.draggedShape.y = this.draggedShape.homeY;
+                }
+                this.draggedShape.isDragging = false;
+                this.draggedShape = null;
+
+                if (this.score >= 3) {
+                    setTimeout(() => {
+                        this.score = 0;
+                        this.spawnShapes();
+                    }, 1000);
+                }
+            }
+        }
+    }
+
+    drawShape(ctx, type, x, y, isTarget) {
+        ctx.save();
+        ctx.translate(x, y);
+        if (isTarget) {
+            ctx.strokeStyle = '#fff';
+            ctx.setLineDash([5, 5]);
+            ctx.lineWidth = 2;
+        } else {
+            ctx.fillStyle = type === 'circle' ? '#94a3b8' : (type === 'rect' ? '#fde047' : '#ef4444');
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 2;
+        }
+
+        ctx.beginPath();
+        if (type === 'circle') {
+            // Draw Shuriken shape as circle rep
+            if(isTarget) ctx.arc(0, 0, 30, 0, Math.PI*2);
+            else {
+                // Shuriken logic
+               Draw.shuriken(ctx, 0, 0, 30, Date.now()/1000);
+            }
+        } else if (type === 'rect') {
+            if(isTarget) ctx.rect(-30, -20, 60, 40);
+            else Draw.scroll(ctx, -30, -20, 60, 40);
+        } else if (type === 'triangle') {
+            // Kunai representation
+             if(isTarget) {
+                 ctx.moveTo(0, -30);
+                 ctx.lineTo(20, 20);
+                 ctx.lineTo(-20, 20);
+                 ctx.closePath();
+             } else {
+                 ctx.fillStyle = '#334155'; // Dark handle
+                 ctx.fillRect(-5, 0, 10, 30);
+                 ctx.fillStyle = '#94a3b8'; // Blade
+                 ctx.beginPath();
+                 ctx.moveTo(0, -40);
+                 ctx.lineTo(15, 0);
+                 ctx.lineTo(-15, 0);
+                 ctx.fill();
+             }
+        }
+
+        if (isTarget) ctx.stroke();
+        else if(type !== 'circle') {
+            // Shuriken draws itself, others need stroke/fill manually if simplified
+            // But here I used custom draw functions mostly.
+        }
+        
+        ctx.restore();
+    }
+
+    draw(ctx) {
+        Draw.button(ctx, this.backBtn.text, this.backBtn.x, this.backBtn.y, this.backBtn.w, this.backBtn.h, false, '#475569');
+        Draw.text(ctx, "結印幾何：將忍具歸位", 400, 50, 30, '#6366f1');
+
+        this.targets.forEach(t => this.drawShape(ctx, t.type, t.x, t.y, true));
+        // Draw matched first
+        this.shapes.forEach(s => {
+            if(s.matched) this.drawShape(ctx, s.type, s.x, s.y, false);
+        });
+        // Draw unmoved
+        this.shapes.forEach(s => {
+            if(!s.matched && !s.isDragging) this.drawShape(ctx, s.type, s.x, s.y, false);
+        });
+        // Draw dragging
+        this.shapes.forEach(s => {
+            if(s.isDragging) this.drawShape(ctx, s.type, s.x, s.y, false);
+        });
+
+        if (this.score >= 3) {
+            Draw.text(ctx, "結印完成！", 400, 300, 50, '#4ade80');
+        }
+    }
+}
+
+/**
+ * 單元三：奧義併式 (Order of Operations)
+ * 點擊正確的運算順序
+ */
+class OrderOpsScene extends Scene {
+    init() {
+        this.level = 1;
+        this.expression = []; // Array of tokens
+        this.backBtn = { x: 20, y: 20, w: 100, h: 40, text: "回主選單" };
+        this.message = "點擊最優先運算的符號";
+        this.generateExpression();
+    }
+
+    generateExpression() {
+        // Generate form: A op1 B op2 C
+        // Ops: +, -, *, /
+        const nums = [
+            Math.floor(Math.random()*10)+1,
+            Math.floor(Math.random()*10)+1,
+            Math.floor(Math.random()*10)+1
+        ];
+        const ops = ['+', '-', '×', '÷'];
+        
+        // Ensure simplicity
+        const op1 = ops[Math.floor(Math.random()*4)];
+        const op2 = ops[Math.floor(Math.random()*4)];
+        
+        // Tokens: [num, op, num, op, num]
+        this.tokens = [
+            { type: 'num', val: nums[0], id: 0 },
+            { type: 'op', val: op1, id: 1, p: (op1=='×'||op1=='÷')?2:1 },
+            { type: 'num', val: nums[1], id: 2 },
+            { type: 'op', val: op2, id: 3, p: (op2=='×'||op2=='÷')?2:1 },
+            { type: 'num', val: nums[2], id: 4 }
+        ];
+        
+        // If priorities equal, left is higher
+        if (this.tokens[1].p >= this.tokens[3].p) {
+            this.tokens[1].target = true;
+            this.tokens[3].target = false;
+        } else {
+            this.tokens[1].target = false;
+            this.tokens[3].target = true;
+        }
+        
+        this.solved = false;
+    }
+
+    update(dt) {
+        if (this.game.input.clicked) {
+            const mx = this.game.input.x;
+            const my = this.game.input.y;
+
+            // Back button
+            if (mx > this.backBtn.x && mx < this.backBtn.x + this.backBtn.w && my > this.backBtn.y && my < this.backBtn.y + this.backBtn.h) {
+                this.game.changeScene(new MenuScene());
+                return;
+            }
+
+            // Check clicks on operators
+            if (this.solved) {
+                if(mx > 0) { // Any click resets
+                    this.solved = false;
+                    this.generateExpression();
+                    this.message = "點擊最優先運算的符號";
+                }
+                return;
+            }
+
+            let baseX = 200;
+            const y = 300;
+            this.tokens.forEach(t => {
+                const w = 60;
+                if (t.type === 'op') {
+                    if (mx > baseX && mx < baseX + w && my > y - 30 && my < y + 30) {
+                        if (t.target) {
+                            this.message = "奧義發動成功！(點擊繼續)";
+                            this.solved = true;
+                            // Visual feedback handled in draw
+                        } else {
+                            this.message = "順序錯誤！查克拉逆流！";
+                        }
+                    }
+                }
+                baseX += 80;
+            });
+        }
+    }
+
+    draw(ctx) {
+        Draw.button(ctx, this.backBtn.text, this.backBtn.x, this.backBtn.y, this.backBtn.w, this.backBtn.h, false, '#475569');
+        Draw.text(ctx, "奧義併式", 400, 50, 30, '#ec4899');
+        Draw.text(ctx, this.message, 400, 500, 24, this.message.includes("錯誤") ? '#ef4444' : '#fff');
+
+        let baseX = 200;
+        const y = 300;
+        
+        this.tokens.forEach(t => {
+            ctx.fillStyle = t.type === 'num' ? '#94a3b8' : '#f97316';
+            if (t.type === 'op') {
+                // Draw circle bg
+                ctx.beginPath();
+                ctx.arc(baseX + 30, y, 30, 0, Math.PI*2);
+                ctx.fill();
+                
+                if (this.solved && t.target) {
+                    ctx.strokeStyle = '#4ade80';
+                    ctx.lineWidth = 4;
+                    ctx.stroke();
+                }
+            } else {
+                // Draw num
+            }
+            
+            Draw.text(ctx, t.val, baseX + 30, y, 30, '#fff');
+            baseX += 80;
+        });
+    }
+}
+
+/**
+ * 單元四：查克拉小數 (Decimals)
+ * 控制液體高度，體驗位值
+ */
+class DecimalScene extends Scene {
+    init() {
+        this.target = 0;
+        this.current = 0;
+        this.backBtn = { x: 20, y: 20, w: 100, h: 40, text: "回主選單" };
+        this.newTarget();
+        this.buttons = [
+            { val: 0.1, text: "+0.1", x: 500, y: 200 },
+            { val: 0.01, text: "+0.01", x: 500, y: 280 },
+            { val: -0.1, text: "-0.1", x: 650, y: 200 },
+            { val: -0.01, text: "-0.01", x: 650, y: 280 },
+        ];
+    }
+
+    newTarget() {
+        // Target between 0.10 and 1.00
+        this.target = (Math.floor(Math.random() * 90) + 10) / 100;
+        this.current = 0;
+        this.message = `注入查克拉至 ${this.target.toFixed(2)}`;
+    }
+
+    update(dt) {
+        if (this.game.input.clicked) {
+            const mx = this.game.input.x;
+            const my = this.game.input.y;
+
+            if (mx > this.backBtn.x && mx < this.backBtn.x + this.backBtn.w && my > this.backBtn.y && my < this.backBtn.y + this.backBtn.h) {
+                this.game.changeScene(new MenuScene());
+                return;
+            }
+
+            this.buttons.forEach(btn => {
+                if (mx > btn.x && mx < btn.x + 120 && my > btn.y && my < btn.y + 60) {
+                    this.current += btn.val;
+                    // Fix float precision
+                    this.current = Math.round(this.current * 100) / 100;
+                    if (this.current < 0) this.current = 0;
+                    if (this.current > 1.2) this.current = 1.2; // Max cap
+                }
+            });
+
+            // Check win
+            if (Math.abs(this.current - this.target) < 0.001) {
+                this.message = "查克拉控制完美！(點擊重置)";
+                if (mx > 100 && mx < 400) { // Click on tube area to reset
+                     this.newTarget();
+                }
+            } else if (this.current > this.target) {
+                this.message = "查克拉溢出了！";
+            } else {
+                 this.message = `注入查克拉至 ${this.target.toFixed(2)}`;
+            }
+        }
+    }
+
+    draw(ctx) {
+        Draw.button(ctx, this.backBtn.text, this.backBtn.x, this.backBtn.y, this.backBtn.w, this.backBtn.h, false, '#475569');
+        Draw.text(ctx, "查克拉小數修行", 400, 50, 30, '#22c55e');
+        Draw.text(ctx, this.message, 400, 500, 24, '#fff');
+
+        // Draw Bamboo Tube
+        const bx = 200;
+        const by = 150;
+        const bw = 100;
+        const bh = 300;
+
+        ctx.fillStyle = '#14532d'; // Dark Green Bamboo
+        ctx.fillRect(bx - 10, by, 10, bh); // Left wall
+        ctx.fillRect(bx + bw, by, 10, bh); // Right wall
+        ctx.fillRect(bx - 10, by + bh, bw + 20, 10); // Bottom
+
+        // Draw Liquid
+        const fillPercent = Math.min(this.current / 1.0, 1.0); // 1.0 is full height
+        const fillHeight = fillPercent * bh;
+        
+        ctx.fillStyle = '#3b82f6'; // Chakra blue
+        ctx.fillRect(bx, by + bh - fillHeight, bw, fillHeight);
+        
+        // Bubbles if match
+        if (Math.abs(this.current - this.target) < 0.001) {
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+            for(let i=0; i<5; i++) {
+                ctx.beginPath();
+                ctx.arc(bx + Math.random()*bw, by + bh - fillHeight + Math.random()*fillHeight, 5, 0, Math.PI*2);
+                ctx.fill();
+            }
+        }
+
+        // Marks
+        ctx.fillStyle = '#fff';
+        ctx.font = '12px Arial';
+        ctx.textAlign = 'right';
+        for (let i = 0; i <= 10; i++) {
+            const h = by + bh - (i * bh / 10);
+            ctx.fillRect(bx - 5, h, 5, 1);
+            ctx.fillText((i/10).toFixed(1), bx - 15, h + 4);
+        }
+        
+        // Target Line
+        const targetH = by + bh - (this.target * bh);
+        ctx.strokeStyle = '#ef4444';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([5, 3]);
+        ctx.beginPath();
+        ctx.moveTo(bx - 20, targetH);
+        ctx.lineTo(bx + bw + 20, targetH);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.fillStyle = '#ef4444';
+        ctx.fillText("目標", bx - 25, targetH);
+
+        // Current Value Display
+        Draw.text(ctx, this.current.toFixed(2), bx + bw/2, by + bh + 40, 30, '#3b82f6');
+
+        // Buttons
+        const mx = this.game.input.x;
+        const my = this.game.input.y;
+        this.buttons.forEach(btn => {
+            const hover = (mx > btn.x && mx < btn.x + 120 && my > btn.y && my < btn.y + 60);
+            Draw.button(ctx, btn.text, btn.x, btn.y, 120, 60, hover, btn.val > 0 ? '#10b981' : '#ef4444');
+        });
+    }
+}
+
+/**
+ * 單元五：情報統計 (Stats)
+ * 互動式長條圖
+ */
+class StatsScene extends Scene {
+    init() {
+        this.backBtn = { x: 20, y: 20, w: 100, h: 40, text: "回主選單" };
+        this.ranks = ['D', 'C', 'B', 'A', 'S'];
+        this.data = this.ranks.map(() => Math.floor(Math.random() * 8) + 2); // 2-10 missions
+        this.selectedBar = -1;
+        this.message = "點擊長條圖查看任務數量";
+    }
+
+    update(dt) {
+        if (this.game.input.clicked) {
+            const mx = this.game.input.x;
+            const my = this.game.input.y;
+
+            if (mx > this.backBtn.x && mx < this.backBtn.x + this.backBtn.w && my > this.backBtn.y && my < this.backBtn.y + this.backBtn.h) {
+                this.game.changeScene(new MenuScene());
+                return;
+            }
+
+            // Check bars
+            const chartX = 150;
+            const chartY = 150;
+            const barW = 80;
+            const gap = 40;
+            
+            this.selectedBar = -1;
+            this.message = "點擊長條圖查看任務數量";
+
+            for(let i=0; i<this.data.length; i++) {
+                const x = chartX + i * (barW + gap);
+                const h = this.data[i] * 30; // scale
+                const y = 450 - h;
+                
+                if (mx > x && mx < x + barW && my > y && my < 450) {
+                    this.selectedBar = i;
+                    this.message = `${this.ranks[i]} 級任務共 ${this.data[i]} 次`;
+                }
+            }
+        }
+    }
+
+    draw(ctx) {
+        Draw.button(ctx, this.backBtn.text, this.backBtn.x, this.backBtn.y, this.backBtn.w, this.backBtn.h, false, '#475569');
+        Draw.text(ctx, "忍者任務統計報告", 400, 50, 30, '#8b5cf6');
+        Draw.text(ctx, this.message, 400, 520, 24, '#fbbf24');
+
+        const chartX = 150;
+        const baseX = 150;
+        const baseY = 450;
+        const barW = 80;
+        const gap = 40;
+
+        // Axis
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(baseX - 20, 100);
+        ctx.lineTo(baseX - 20, baseY);
+        ctx.lineTo(750, baseY);
+        ctx.stroke();
+
+        // Bars
+        this.data.forEach((val, i) => {
+            const x = baseX + i * (barW + gap);
+            const h = val * 30;
+            const y = baseY - h;
+            
+            ctx.fillStyle = (this.selectedBar === i) ? '#f472b6' : '#6366f1';
+            ctx.fillRect(x, y, barW, h);
+            
+            // Label
+            Draw.text(ctx, this.ranks[i], x + barW/2, baseY + 20, 20, '#94a3b8');
+            
+            // Value (only if selected)
+            if (this.selectedBar === i) {
+                Draw.text(ctx, val, x + barW/2, y - 15, 20, '#fff');
+            }
+        });
+    }
+}
+
+// 啟動遊戲
+window.onload = () => {
+    const game = new Game('game-canvas');
+    game.changeScene(new MenuScene());
+};
+
+</script>
+</body>
+</html>
