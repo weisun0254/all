@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>大洋周 Tanya English - 2026 寒假活動全攻略</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        /* --- 基礎設定 --- */
+        :root {
+            --primary-color: #0056b3; /* 品牌藍 */
+            --accent-color: #ff9f1c;  /* 活力橘 */
+            --bg-color: #f4f7f6;
+            --text-color: #333;
+        }
+
+        body {
+            font-family: 'Noto Sans TC', sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+        }
+
+        /* --- 頁首 Header --- */
+        header {
+            background: white;
+            padding: 20px;
+            text-align: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 1.5rem;
+            color: var(--primary-color);
+        }
+
+        p.subtitle {
+            margin: 5px 0 0;
+            font-size: 0.9rem;
+            color: #666;
+        }
+
+        /* --- 分類按鈕區 --- */
+        .filter-container {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 10px;
+            padding: 15px;
+            background: #fff;
+            border-bottom: 1px solid #eee;
+        }
+
+        .filter-btn {
+            border: none;
+            background: #e0e0e0;
+            color: #333;
+            padding: 8px 16px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 0.95rem;
+            transition: all 0.3s ease;
+        }
+
+        .filter-btn:hover, .filter-btn.active {
+            background: var(--primary-color);
+            color: white;
+            box-shadow: 0 4px 6px rgba(0,86,179,0.3);
+        }
+
+        /* --- 圖片展示區 Grid --- */
+        .gallery-container {
+            max-width: 1200px;
+            margin: 20px auto;
+            padding: 0 15px;
+            columns: 3 300px; /* 瀑布流效果 */
+            column-gap: 20px;
+        }
+
+        .gallery-item {
+            break-inside: avoid; /* 防止圖片被切斷 */
+            background: white;
+            border-radius: 12px;
+            overflow: hidden;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+            transition: transform 0.3s ease;
+            cursor: pointer;
+        }
+
+        .gallery-item:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+        }
+
+        .gallery-item img {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+
+        .item-info {
+            padding: 12px;
+        }
+
+        .item-tag {
+            display: inline-block;
+            font-size: 0.8rem;
+            padding: 3px 8px;
+            border-radius: 4px;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+
+        /* 標籤顏色 */
+        .tag-academic { background-color: #e3f2fd; color: #1565c0; }
+        .tag-skill { background-color: #fff3e0; color: #ef6c00; }
+        .tag-trip { background-color: #e8f5e9; color: #2e7d32; }
+        .tag-admin { background-color: #fce4ec; color: #c2185b; }
+
+        .item-title {
+            font-size: 1rem;
+            font-weight: 700;
+            margin: 5px 0 0;
+        }
+
+        /* --- 燈箱 Lightbox (放大圖片用) --- */
+        .lightbox {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.9);
+            justify-content: center;
+            align-items: center;
+            cursor: zoom-out;
+        }
+
+        .lightbox img {
+            max-width: 90%;
+            max-height: 90%;
+            border-radius: 4px;
+            box-shadow: 0 0 20px rgba(255,255,255,0.1);
+        }
+
+        .close-lightbox {
+            position: absolute;
+            top: 20px;
+            right: 30px;
+            color: white;
+            font-size: 40px;
+            cursor: pointer;
+            font-family: sans-serif;
+        }
+
+        /* --- 懸浮按鈕 --- */
+        .fab-contact {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            background-color: var(--accent-color);
+            color: white;
+            padding: 15px 25px;
+            border-radius: 50px;
+            font-weight: bold;
+            box-shadow: 0 4px 15px rgba(255, 159, 28, 0.5);
+            text-decoration: none;
+            z-index: 90;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: transform 0.2s;
+        }
+
+        .fab-contact:hover {
+            transform: scale(1.05);
+        }
+
+        /* --- Footer --- */
+        footer {
+            text-align: center;
+            padding: 40px 20px;
+            color: #888;
+            font-size: 0.9rem;
+            margin-bottom: 60px; /* 留位置給懸浮按鈕 */
+        }
+
+        /* --- 手機版調整 --- */
+        @media (max-width: 600px) {
+            .gallery-container {
+                columns: 1; /* 手機變單欄 */
+            }
+            h1 { font-size: 1.3rem; }
+            .fab-contact {
+                bottom: 20px;
+                right: 20px;
+                padding: 12px 20px;
+                font-size: 0.9rem;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>大洋周 Tanya English</h1>
+        <p class="subtitle">2026 寒假活動全攻略 | 讓孩子寒假不留白</p>
+    </header>
+
+    <nav class="filter-container">
+        <button class="filter-btn active" onclick="filterGallery('all')">全部顯示</button>
+        <button class="filter-btn" onclick="filterGallery('academic')">📚 學科先修</button>
+        <button class="filter-btn" onclick="filterGallery('skill')">🎨 素養與手作</button>
+        <button class="filter-btn" onclick="filterGallery('trip')">🚌 校外教學</button>
+        <button class="filter-btn" onclick="filterGallery('admin')">📢 行政與優惠</button>
+    </nav>
+
+    <main class="gallery-container" id="gallery">
+        
+        <div class="gallery-item academic">
+            <img src="IMG_1863.jpg" alt="國語先修" onclick="openLightbox(this)">
+            <div class="item-info">
+                <span class="item-tag tag-academic">國語先修</span>
+                <h3 class="item-title">閱讀理解與字彙擴充</h3>
+            </div>
+        </div>
+        <div class="gallery-item academic">
+            <img src="IMG_1864.jpg" alt="數學先修" onclick="openLightbox(this)">
+            <div class="item-info">
+                <span class="item-tag tag-academic">數學先修</span>
+                <h3 class="item-title">突破下學期數學卡關點</h3>
+            </div>
+        </div>
+        <div class="gallery-item academic">
+            <img src="IMG_1865.jpg" alt="社會先修" onclick="openLightbox(this)">
+            <div class="item-info">
+                <span class="item-tag tag-academic">社會先修</span>
+                <h3 class="item-title">理解記憶，告別死背</h3>
+            </div>
+        </div>
+
+        <div class="gallery-item skill">
+            <img src="IMG_1862.jpg" alt="寫作料理課" onclick="openLightbox(this)">
+            <div class="item-info">
+                <span class="item-tag tag-skill">創意寫作</span>
+                <h3 class="item-title">寫作料理秘笈：人人都是小作家</h3>
+            </div>
+        </div>
+        <div class="gallery-item skill">
+            <img src="IMG_1861.jpg" alt="科學實驗" onclick="openLightbox(this)">
+            <div class="item-info">
+                <span class="item-tag tag-skill">STEAM 科學</span>
+                <h3 class="item-title">水的魔法與槓桿原理</h3>
+            </div>
+        </div>
+        <div class="gallery-item skill">
+            <img src="IMG_1859.jpg" alt="冬令營手作" onclick="openLightbox(this)">
+            <div class="item-info">
+                <span class="item-tag tag-skill">文化手作</span>
+                <h3 class="item-title">剪紙、漆扇、燈籠創意製作</h3>
+            </div>
+        </div>
+
+        <div class="gallery-item trip">
+            <img src="IMG_1855.jpg" alt="宜蘭校外教學" onclick="openLightbox(this)">
+            <div class="item-info">
+                <span class="item-tag tag-trip">宜蘭一日遊</span>
+                <h3 class="item-title">觀光工廠與水樂園體驗</h3>
+            </div>
+        </div>
+        <div class="gallery-item trip">
+            <img src="IMG_1866.jpg" alt="府中校外教學" onclick="openLightbox(this)">
+            <div class="item-info">
+                <span class="item-tag tag-trip">城市探索</span>
+                <h3 class="item-title">府中15藝文體驗與聚餐</h3>
+            </div>
+        </div>
+
+        <div class="gallery-item admin">
+            <img src="IMG_1860.jpg" alt="收費通知" onclick="openLightbox(this)">
+            <div class="item-info">
+                <span class="item-tag tag-admin">重要公告</span>
+                <h3 class="item-title">1-2月份收費與行事曆</h3>
+            </div>
+        </div>
+        <div class="gallery-item admin">
+            <img src="IMG_1858.jpg" alt="推薦獎勵" onclick="openLightbox(this)">
+            <div class="item-info">
+                <span class="item-tag tag-admin">好康活動</span>
+                <h3 class="item-title">老友帶新友推薦獎勵計畫</h3>
+            </div>
+        </div>
+
+    </main>
+
+    <footer>
+        <p>📍 新北市板橋區中山路二段365-1號2樓 | 📞 02-29646498</p>
+        <p>© 2026 大洋周 Tanya English</p>
+    </footer>
+
+    <a href="tel:0229646498" class="fab-contact">
+        📞 立即諮詢 / 報名
+    </a>
+
+    <div id="lightbox" class="lightbox" onclick="closeLightbox()">
+        <span class="close-lightbox">&times;</span>
+        <img id="lightbox-img" src="" alt="放大預覽">
+    </div>
+
+    <script>
+        // 分類過濾功能
+        function filterGallery(category) {
+            // 1. 處理按鈕樣式
+            const buttons = document.querySelectorAll('.filter-btn');
+            buttons.forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+
+            // 2. 處理圖片顯示
+            const items = document.querySelectorAll('.gallery-item');
+            
+            items.forEach(item => {
+                if (category === 'all') {
+                    item.style.display = 'block';
+                } else {
+                    if (item.classList.contains(category)) {
+                        item.style.display = 'block';
+                    } else {
+                        item.style.display = 'none';
+                    }
+                }
+            });
+        }
+
+        // 燈箱功能
+        const lightbox = document.getElementById('lightbox');
+        const lightboxImg = document.getElementById('lightbox-img');
+
+        function openLightbox(element) {
+            lightbox.style.display = 'flex';
+            lightboxImg.src = element.src; // 將點擊的圖片路徑複製給燈箱
+        }
+
+        function closeLightbox() {
+            lightbox.style.display = 'none';
+        }
+
+        // 監聽鍵盤 ESC 關閉燈箱
+        document.addEventListener('keydown', function(event) {
+            if (event.key === "Escape") {
+                closeLightbox();
+            }
+        });
+    </script>
+</body>
+</html>
